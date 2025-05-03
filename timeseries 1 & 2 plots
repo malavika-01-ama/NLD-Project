@@ -1,0 +1,27 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Load time series (update if needed)
+ts1 = np.loadtxt("timeseries1.txt")[:, 1]
+ts2 = np.loadtxt("timeseries2.txt")[:, 1]
+time = np.arange(len(ts1))
+
+# Plot timeseries1
+plt.figure(figsize=(12, 4))
+plt.plot(time, ts1, color='blue')
+plt.title("timeseries1: Value vs Time")
+plt.xlabel("Time (index)")
+plt.ylabel("Value")
+plt.grid(True)
+plt.tight_layout()
+plt.show()
+
+# Plot timeseries2
+plt.figure(figsize=(12, 4))
+plt.plot(time, ts2, color='green')
+plt.title("timeseries2: Value vs Time")
+plt.xlabel("Time (index)")
+plt.ylabel("Value")
+plt.grid(True)
+plt.tight_layout()
+plt.show()
