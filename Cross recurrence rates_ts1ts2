@@ -1,0 +1,17 @@
+def cross_recurrence_plot(ts1, ts2, epsilon):
+    """Compute cross recurrence matrix between two time series."""
+    distance_matrix = np.abs(ts1[:, None] - ts2[None, :])
+    return distance_matrix < epsilon
+
+def cross_recurrence_rate(CR):
+    """Compute cross recurrence rate."""
+    return np.sum(CR) / CR.size
+
+# Use average epsilon for consistency
+epsilon_cr = 0.1 * (np.std(ts1) + np.std(ts2)) / 2
+
+# Compute cross recurrence matrix and rate
+CR = cross_recurrence_plot(ts1, ts2, epsilon_cr)
+CRR = cross_recurrence_rate(CR)
+
+print(f"Cross Recurrence Rate (CRR) between ts1 and ts2: {CRR:.4f}")
