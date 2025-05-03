@@ -1,0 +1,52 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.spatial.distance import cdist
+
+# --- Load time series ---
+ts1 = np.loadtxt("timeseries1.txt")[:, 1]
+ts2 = np.loadtxt("timeseries2.txt")[:, 1]
+
+# --- Recurrence plot (RP) without squareform ---
+def recurrence_plot_efficient(x, eps=None):
+    x = x.reshape(-1, 1)
+    if eps is None:
+        eps = 0.1 * np.std(x)
+    D = cdist(x, x, metric='euclidean')
+    RP = (D < eps).astype(int)
+    return RP
+
+# --- Cross recurrence plot (CRP) ---
+def cross_recurrence_plot_efficient(x1, x2, eps=None):
+    x1 = x1.reshape(-1, 1)
+    x2 = x2.reshape(-1, 1)
+    if eps is None:
+        eps = 0.1 * (np.std(x1) + np.std(x2)) / 2
+    D = cdist(x1, x2, metric='euclidean')
+    CRP = (D < eps).astype(int)
+    return CRP
+
+# --- Compute recurrence and cross recurrence matrices ---
+rp1 = recurrence_plot_efficient(ts1)
+rp2 = recurrence_plot_efficient(ts2)
+crp = cross_recurrence_plot_efficient(ts1, ts2)
+
+# --- Plotting ---
+fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+
+axes[0].imshow(rp1, cmap='binary', origin='lower')
+axes[0].set_title("Recurrence Plot: timeseries1")
+axes[0].set_xlabel("Time")
+axes[0].set_ylabel("Time")
+
+axes[1].imshow(rp2, cmap='binary', origin='lower')
+axes[1].set_title("Recurrence Plot: timeseries2")
+axes[1].set_xlabel("Time")
+axes[1].set_ylabel("Time")
+
+axes[2].imshow(crp, cmap='binary', origin='lower')
+axes[2].set_title("Cross Recurrence Plot")
+axes[2].set_xlabel("timeseries2")
+axes[2].set_ylabel("timeseries1")
+
+plt.tight_layout()
+plt.show()
