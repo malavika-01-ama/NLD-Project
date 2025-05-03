@@ -1,0 +1,122 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.spatial.distance import pdist
+from scipy.stats import linregress
+from sklearn.metrics import mutual_info_score
+from sklearn.neighbors import NearestNeighbors
+
+# --- Load time series data ---
+data = np.loadtxt('timeseries1.txt')[:, 1]  # Replace with your file if needed
+
+# --- Step 1: Self Mutual Information (first turning minimum) ---
+def self_mutual_information_first_true_minimum(x, max_lag=1000):
+    mi = []
+    for lag in range(1, max_lag + 1):
+        x1 = x[:-lag]
+        x2 = x[lag:]
+        bins = int(np.sqrt(len(x1)))
+        c_xy = np.histogram2d(x1, x2, bins)[0]
+        mi_val = mutual_info_score(None, None, contingency=c_xy)
+        mi.append(mi_val)
+    mi = np.array(mi)
+    d1 = np.gradient(mi)
+    for i in range(1, len(d1)):
+        if d1[i - 1] < 0 and d1[i] > 0:
+            return i + 1, mi
+    return 1, mi  # fallback if no minimum is found
+
+# --- Step 2: False Nearest Neighbors ---
+def false_nearest_neighbors_custom_fixed(x, tau, max_dim=10, r=15, sigma_r=2):
+    N = len(x)
+    fnn_percentages = []
+    for m in range(1, max_dim + 1):
+        M = N - (m + 1) * tau
+        if M <= 0:
+            break
+        Y_m = np.array([x[i:M + i] for i in range(0, m * tau + 1, tau)]).T
+        Y_m1 = np.array([x[i:M + i] for i in range(0, (m + 1) * tau + 1, tau)]).T
+        nbrs = NearestNeighbors(n_neighbors=2).fit(Y_m)
+        distances, indices = nbrs.kneighbors(Y_m)
+        false_count = 0
+        total_count = 0
+        for i in range(len(Y_m)):
+            j = indices[i, 1]
+            d_m = np.linalg.norm(Y_m[i] - Y_m[j])
+            if d_m == 0 or np.linalg.norm(Y_m[i]) == 0:
+                continue
+            d_m1 = np.linalg.norm(Y_m1[i] - Y_m1[j])
+            condition_1 = (d_m1 / d_m) > r
+            condition_2 = d_m < sigma_r
+            if condition_1 and condition_2:
+                false_count += 1
+            if condition_2:
+                total_count += 1
+        fnn_percent = (false_count / total_count) if total_count > 0 else 0
+        fnn_percentages.append(fnn_percent)
+    return fnn_percentages
+
+# --- Step 3: Correlation Dimension ---
+def correlation_dimension(x, m, tau, fit_region=(15, 40)):
+    N = len(x) - (m - 1) * tau
+    embedded = np.array([x[i:i + N * tau:tau] for i in range(m)]).T
+    embedded = embedded[:N]
+    D = pdist(embedded)
+    r_vals = np.logspace(np.log10(np.min(D) * 0.5), np.log10(np.max(D) * 0.5), 50)
+    C = np.array([(np.sum(D < r)) / len(D) for r in r_vals])
+    log_r = np.log(r_vals)
+    log_C = np.log(C)
+    fit_region = slice(*fit_region)
+    slope, intercept, r_value, p_value, std_err = linregress(log_r[fit_region], log_C[fit_region])
+    return slope, std_err, log_r, log_C
+
+# --- Run full pipeline ---
+tau, mi_vals = self_mutual_information_first_true_minimum(data)
+fnn_vals = false_nearest_neighbors_custom_fixed(data, tau, max_dim=20)
+
+# Choose optimal embedding dimension where FNN saturates (or drops near 0)
+m_opt = np.argmin(fnn_vals) + 1
+D2, D2_err, log_r, log_C_r = correlation_dimension(data, m_opt, tau, fit_region=(15, 40))
+
+# --- Plotting ---
+plt.figure(figsize=(15, 5))
+
+# Mutual Information
+plt.subplot(1, 3, 1)
+plt.plot(range(1, min(len(mi_vals), 101)), mi_vals[:100], marker='o', label='I(t)')
+plt.axvline(tau, color='r', linestyle='--', label=f'τ = {tau}')
+plt.title("Self Mutual Information")
+plt.xlabel("Time delay (τ)")
+plt.ylabel("I(t)")
+plt.xlim(0, 100)
+plt.legend()
+plt.grid(True)
+
+# FNN
+plt.subplot(1, 3, 2)
+plt.plot(range(1, len(fnn_vals) + 1), fnn_vals, marker='o', label='FNN')
+plt.axvline(m_opt, color='r', linestyle='--', label=f'Saturation m = {m_opt}')
+plt.title("False Nearest Neighbors (FNN)")
+plt.xlabel("Embedding Dimension (m)")
+plt.ylabel("FNN")
+plt.xticks(range(1, len(fnn_vals) + 1))
+plt.legend()
+plt.grid(True)
+
+# Correlation Dimension
+plt.subplot(1, 3, 3)
+log_r_filtered = log_r[log_r > -4]
+log_C_r_filtered = log_C_r[log_r > -4]
+plt.scatter(log_r_filtered, log_C_r_filtered, label=f'D2 = {D2:.2f} ± {D2_err:.2f}', color='blue')
+plt.title("Correlation Dimension")
+plt.xlabel("log(r)")
+plt.ylabel("log(C(r))")
+plt.legend()
+plt.grid(True)
+
+plt.tight_layout()
+plt.show()
+
+# --- Output Results ---
+print(f"Estimated time delay (τ): {tau}")
+print(f"Estimated embedding dimension (m): {m_opt}")
+print(f"Estimated correlation dimension (D2): {D2:.2f} ± {D2_err:.2f}")
