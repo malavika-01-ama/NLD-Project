@@ -1,0 +1,44 @@
+from scipy.spatial.distance import pdist, squareform
+
+def recurrence_plot(ts, epsilon):
+    """Return recurrence matrix given time series and threshold epsilon."""
+    distance_matrix = squareform(pdist(ts[:, None], metric='euclidean'))
+    return distance_matrix < epsilon
+
+def recurrence_quantification(R, l_min=2):
+    """Compute recurrence rate and determinism from recurrence matrix R."""
+    RR = np.sum(R) / R.size
+
+    # Determinism: find diagonal lines of length >= l_min
+    DET = 0
+    total_diagonals = 0
+
+    for k in range(-R.shape[0]+1, R.shape[1]):
+        diag = np.diagonal(R, offset=k)
+        length = 0
+        for val in diag:
+            if val:
+                length += 1
+            else:
+                if length >= l_min:
+                    DET += length
+                length = 0
+        if length >= l_min:
+            DET += length
+
+    DET /= np.sum(R) if np.sum(R) != 0 else 1
+    return RR, DET
+
+# Set threshold epsilon based on standard deviation
+epsilon1 = 0.1 * np.std(ts1)
+epsilon2 = 0.1 * np.std(ts2)
+
+# Recurrence matrix and metrics
+R1 = recurrence_plot(ts1, epsilon1)
+R2 = recurrence_plot(ts2, epsilon2)
+
+RR1, DET1 = recurrence_quantification(R1)
+RR2, DET2 = recurrence_quantification(R2)
+
+print(f"Timeseries1 - Recurrence Rate (RR): {RR1:.4f}, Determinism (DET): {DET1:.4f}")
+print(f"Timeseries2 - Recurrence Rate (RR): {RR2:.4f}, Determinism (DET): {DET2:.4f}")
